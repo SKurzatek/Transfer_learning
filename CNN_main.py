@@ -8,7 +8,7 @@ from torchsummary import summary
 from torch.amp import autocast, GradScaler
 from torch.utils.data import DataLoader, Subset
 
-from utils.CNN_dataset import DynamicResolutionDataset
+from utils.CNN_dataset import DynamicResolutionImageDataset
 import utils.CNN_components as components
 
 class_list = ["inside", "outside"]
@@ -24,7 +24,7 @@ class Network(torch.nn.Module):
         self.init_block = components.InitBlock(out_channels = 64)
         self.blocks = torch.nn.ModuleList([
             components.Module(
-                        conv_blocks_number = 1,
+                        conv_blocks_number = 0,
                         in_channels = 64, 
                         internal_channels = 64,
                         out_channels = 64,
@@ -34,28 +34,18 @@ class Network(torch.nn.Module):
                         dropout = False
                     ),
             components.Module(
-                        conv_blocks_number = 1,
+                        conv_blocks_number = 0,
                         in_channels = 64, 
-                        internal_channels = 128,
-                        out_channels = 128,
+                        internal_channels = 64,
+                        out_channels = 64,
                         bypass = True,
                         max_pool = True,
-                        batch_norm = True,
-                        dropout = False
-                    ),
-            components.Module(
-                        conv_blocks_number = 0,
-                        in_channels = 128, 
-                        internal_channels = 256,
-                        out_channels = 256,
-                        bypass = True,
-                        max_pool = False,
                         batch_norm = True,
                         dropout = False
                     )
         ]) 
         self.gap = torch.nn.AdaptiveAvgPool2d((1, 1))
-        self.classifier = torch.nn.Linear(256, 12)
+        self.classifier = torch.nn.Linear(64, 2)
 
     def forward(self, x):
         x = self.init_block(x)
@@ -72,27 +62,25 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    epochs = 30
+    epochs = 1
     F1_history = [0 for _ in range(epochs)]
     loss_history = [0 for _ in range(epochs)]
     time_history = [0 for _ in range(epochs)]
 
-    train_dataset = DynamicResolutionDataset(
-            root_dir="./dataset_high_res_preprocessed/train",
-            class_list=class_list,
-            target_n_mels=64
+    train_dataset = DynamicResolutionImageDataset(
+            root_dir="./dataset",
+            class_list=class_list
         )
-            
-    test_dataset = DynamicResolutionDataset(
-            root_dir="./dataset_high_res_preprocessed/valid",
-            class_list=class_list,
-            target_n_mels=64
+    
+    test_dataset = DynamicResolutionImageDataset(
+            root_dir="./dataset",
+            class_list=class_list
         )
 
-    train_loader = DataLoader(train_dataset, batch_size = 128, shuffle=True, num_workers=4, pin_memory=True)
-    test_loader = DataLoader(test_dataset, batch_size = 256, shuffle=False, num_workers=4, pin_memory=True)
+    train_loader = DataLoader(train_dataset, batch_size = 32, shuffle=True, num_workers=4, pin_memory=True)
+    #test_loader = DataLoader(test_dataset, batch_size = 256, shuffle=False, num_workers=4, pin_memory=True)
     
-    test_dataset_size = len(test_dataset)
+    #test_dataset_size = len(test_dataset)
 
     model = Network()
     model.to(device)
@@ -124,19 +112,24 @@ def main():
                     
         end_time = time.time()
 
-        epoch_f1 = components.evaluate_f1_score(model=model, test_loader=test_loader, device=device)
-        F1_history[epoch] = epoch_f1
+        #epoch_f1 = components.evaluate_f1_score(model=model, test_loader=test_loader, device=device)
+        #F1_history[epoch] = epoch_f1
         loss_history[epoch] = total_loss
         time_history[epoch] = end_time - start_time
 
         print(f"Time for testing: {time.time() - end_time}")
-        print(f"Epoch {epoch + 1}, Training Loss: {total_loss}, F1_scrore: {epoch_f1}, Time: {end_time - start_time}s")
+        #print(f"Epoch {epoch + 1}, Training Loss: {total_loss}, F1_scrore: {epoch_f1}, Time: {end_time - start_time}s")
+        print(f"Epoch {epoch + 1}, Training Loss: {total_loss}, Time: {end_time - start_time}s")
         print()
+        '''
+        
         if(epoch_f1>best_F1):
             torch.save(copy.deepcopy(model.state_dict()), f"./models/checkpoint/model.pth")
             torch.save(optimizer.state_dict(), f"./models/checkpoint/optimizer.pth")
             best_F1 = epoch_f1
-    
+        
+        '''
+
     print("F1_score:")
     print(F1_history)
     print("Loss:")

@@ -11,7 +11,7 @@ class InitBlock(torch.nn.Module):
                 torch.nn.BatchNorm2d(out_channels, affine=True) 
             )  
         '''      
-        self.init_conv = torch.nn.Conv2d(1, out_channels, kernel_size = 3, stride = 1, padding = 1)
+        self.init_conv = torch.nn.Conv2d(3, out_channels, kernel_size = 3, stride = 1, padding = 1)
     
     def forward(self, x):
         #y = self.init_conv(x)
