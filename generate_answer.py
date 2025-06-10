@@ -1,9 +1,8 @@
 import os
 import re
 
-def build_predictions_txt(root_dir='labeled_data',
-                          output_file='predictions.txt'):
-
+def build_labels_txt(root_dir='labeled_data',
+                     output_file='predictions.txt'):
     label_map = {'inside': 0, 'outside': 1}
     entries = []
 
@@ -20,15 +19,15 @@ def build_predictions_txt(root_dir='labeled_data',
         name, _ = item
         stem = os.path.splitext(name)[0]
         m = re.search(r'(\d+)$', stem)
-        return int(m.group(1)) if m else stem
+        return int(m.group(1)) if m else float('inf')
 
     entries.sort(key=sort_key)
 
     with open(output_file, 'w') as f:
-        for fname, label in entries:
-            f.write(f"{fname}\t{label}\n")
+        for _, label in entries:
+            f.write(f"{label}\n")
 
-    print(f"Wrote {len(entries)} entries to {output_file}")
+    print(f"Wrote {len(entries)} labels to {output_file}")
 
 if __name__ == "__main__":
-    build_predictions_txt()
+    build_labels_txt()
