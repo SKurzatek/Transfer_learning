@@ -9,7 +9,6 @@ from transformers import (
     AutoTokenizer, AutoModelForSeq2SeqLM
 )
 
-# === CONFIG ===
 CHECKPOINT_INTERVAL = 100
 BATCH_SIZE = 10
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -134,7 +133,6 @@ def classify_clip_batch(df_batch, model, processor, top_k_tags=3):
         batch = df_batch.iloc[i:i + BATCH_SIZE]
         images = []
 
-        # Load images
         for row in batch.itertuples():
             try:
                 if not str(row.mime_type).startswith(("image/jpeg", "image/png")):
@@ -146,10 +144,8 @@ def classify_clip_batch(df_batch, model, processor, top_k_tags=3):
             except Exception:
                 images.append(None)
 
-        # Safe fallback images
         safe_images = [img if img else Image.new("RGB", (224, 224)) for img in images]
 
-        # Inside/outside classification
         inputs_io = processor(images=safe_images, text=io_texts, return_tensors="pt", padding=True).to(DEVICE)
         with torch.no_grad():
             outputs_io = model(**inputs_io)
@@ -164,7 +160,6 @@ def classify_clip_batch(df_batch, model, processor, top_k_tags=3):
             probs_tags = outputs_tags.logits_per_image.softmax(dim=1).cpu()
         '''
 
-        # Aggregate results per image
         for j in range(len(images)):
             if images[j] is None:
                 results.append({
@@ -217,7 +212,7 @@ def load_flan():
 
 # === FLAN BATCH CLASSIFICATION ===
 def classify_flan_batch(df_batch, model, tokenizer):
-    # Few-shot descriptive prefix with context
+
     prefix = (
         "You are a classifier that labels Wikipedia article images as 'inside', 'outside', or 'garbage'.\n"
         "- inside: enclosed spaces (walls, ceilings, furniture).\n"
@@ -251,7 +246,7 @@ def classify_flan_batch(df_batch, model, tokenizer):
         if not caption or not isinstance(caption, str):
             prompts.append(None)
             continue
-        # build tag string
+
         if len(tags) > 0:
             tag_str = ", ".join([f"'{t}' ({s:.2f})" for t, s in zip(tags, scores)])
         else:
@@ -265,7 +260,6 @@ def classify_flan_batch(df_batch, model, tokenizer):
         prompts.append(prompt)
         valid_idx.append(i)
 
-    # generate for valid prompts
     if not valid_idx:
         return pd.DataFrame([{'flan_label': None, 'flan_confidence': 0.0} for _ in prompts])
 

@@ -12,7 +12,6 @@ from torch.utils.data import DataLoader
 warnings.filterwarnings("ignore", message="Corrupt EXIF data")
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
-# Configuration
 DATASET_DIR = "dataset"
 LABELS = ["inside", "outside"]
 BUCKETS = [
@@ -31,7 +30,6 @@ def bucket_resolution(width, height):
     return "unknown"
 
 def collect_resolution_buckets_split():
-    # Format: bucket_counts[bucket][label] = count
     bucket_counts = defaultdict(lambda: {"inside": 0, "outside": 0})
 
     for label in LABELS:

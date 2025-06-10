@@ -16,7 +16,6 @@ def download_dataset():
     pd.set_option('display.max_colwidth', None)
     pd.set_option('expand_frame_repr', True)
 
-    # Step 1: Load and merge parquet files
     dir_list = os.listdir(PARQUET_DIR)
     df_list = []
     for file in dir_list:
@@ -35,8 +34,7 @@ def download_dataset():
     print("Columns:", list(df.columns))
     print("Total rows:", len(df))
 
-    # Step 2: Preview first 32 entries
-    print("\n--- Sample Preview (first 32 rows) ---")
+    print("\n--- Sample Preview ---")
     for i in range(1500, min(1600, len(df))):
         row = df.iloc[i]
         print(f"\nRow {i}:")

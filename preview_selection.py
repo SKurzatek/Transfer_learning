@@ -67,11 +67,9 @@ def evaluate_image_selection(row):
     clip_conf = row.get("clip_confidence", 0.0)
     flan_conf = row.get("flan_confidence", 0.0)
 
-    # Final Inside Label: Only CLIP decides
     if clip_label == "inside" and clip_conf >= CLIP_PRIMARY_CONF:
         return True, "inside"
 
-    # Final Outside Label: Both must agree, both confident
     if (
         clip_label == "outside" and
         flan_label == "outside" and
@@ -102,7 +100,6 @@ def download_selection():
 
     df = pd.concat(df_list, axis=0, ignore_index=True)
 
-    # Apply unified selection + final label logic
     df[["selected", "final_label"]] = df.apply(
         evaluate_image_selection, axis=1, result_type="expand"
     )
@@ -120,7 +117,6 @@ async def download_image(session: ClientSession, url: str, label: str, sem: asyn
             subdir = INSIDE_DIR if label == "inside" else OUTSIDE_DIR
             out_path = os.path.join(subdir, filename)
 
-            # Deduplicate
             counter = 1
             base, ext = os.path.splitext(out_path)
             while os.path.exists(out_path):

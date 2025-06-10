@@ -9,7 +9,6 @@ from transformers import (
     AutoTokenizer, AutoModelForSeq2SeqLM
 )
 
-# === CONFIG ===
 CHECKPOINT_INTERVAL = 100
 BATCH_SIZE = 20
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -46,7 +45,6 @@ def classify_clip_batch(df_batch, model, processor):
         batch = df_batch.iloc[i:i + BATCH_SIZE]
         images = []
 
-        # Preprocess image bytes to PIL.Image
         for row in batch.itertuples():
             try:
                 if not str(row.mime_type).startswith(("image/jpeg", "image/png")):
@@ -123,10 +121,9 @@ def classify_flan_batch(df_batch, model, tokenizer):
             output_hidden_states=False
         )
         decoded = tokenizer.batch_decode(output.sequences, skip_special_tokens=True)
-        scores = output.scores[0]  # First token scores
+        scores = output.scores[0]
 
-    # Top token ID from each sequence
-    top_token_ids = output.sequences[:, 1]  # skip BOS token
+    top_token_ids = output.sequences[:, 1]
 
     for i in range(len(prompts)):
         if i not in valid_indices:
