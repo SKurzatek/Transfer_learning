@@ -14,30 +14,25 @@ CHECKPOINT_INTERVAL = 100
 BATCH_SIZE = 20
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-'''
-PROMPTS = [
-    # Inside (label index 0)
-    "A photo taken inside a building, showing furniture, walls, or artificial lighting",
-    "An indoor scene such as an office, living room, classroom, or kitchen",
-    "A room with windows, ceilings, and indoor lighting",
-    
-    # Outside (label index 1)
-    "A photo taken outdoors, showing natural scenery like trees, sky, grass, or mountains",
-    "An outside environment such as a street, park, forest, or beach",
-    "A scene captured under open sky with sunlight or distant horizon"
+INSIDE_PROMPTS = [
+    "living room interior with a gray sofa, wooden coffee table, and large windows",
+    "modern office space with desks, swivel chairs, computers, and overhead lights",
+    "cozy bedroom interior with a bed, nightstand, lamp, and patterned rug",
+    "hallway inside a building with artificial lighting and tiled floor",
+    "kitchen interior with countertops, cabinets, and indoor lighting"
 ]
-'''
-
-PROMPTS = [
-    "A photo taken inside a building (e.g., room, building interior, people inside, furniture, interior lighting)",
-    "A photo taken outside a building (e.g., landscape, street, open area, animals in the field, sky, outdoor lighting)"
+OUTSIDE_PROMPTS = [
+    "outdoor park with grass, trees, and a walking path",
+    "mountain landscape with sky, rocks, and vegetation",
+    "streetscape outside showing buildings, sidewalk, and open sky",
+    "beach scene with sand, sea, and horizon in the distance",
+    "forest environment with trees, underbrush, and natural light"
 ]
 
-INPUT_PARQUET = "train-00000-of-00330.parquet"
-OUTPUT_DIR = "FLAN_CLIP_checkpoints"
+INPUT_PARQUET = "train-00001-of-00330.parquet"
+OUTPUT_DIR = "FLAN_CLIP_checkpoints_2"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# === CLIP MODEL SETUP ===
 def load_clip():
     model = CLIPModel.from_pretrained("laion/CLIP-ViT-H-14-laion2B-s32B-b79K").to(DEVICE)
     processor = CLIPProcessor.from_pretrained("laion/CLIP-ViT-H-14-laion2B-s32B-b79K")
@@ -45,6 +40,7 @@ def load_clip():
 
 def classify_clip_batch(df_batch, model, processor):
     results = []
+    texts = INSIDE_PROMPTS + OUTSIDE_PROMPTS
 
     for i in tqdm.tqdm(range(0, len(df_batch), BATCH_SIZE)):
         batch = df_batch.iloc[i:i + BATCH_SIZE]
@@ -65,22 +61,25 @@ def classify_clip_batch(df_batch, model, processor):
         # Replace invalid images with blank filler
         safe_images = [img if img else Image.new("RGB", (224, 224)) for img in images]
 
-        # Encode with CLIP processor
-        inputs = processor(images=safe_images, text=PROMPTS, return_tensors="pt", padding=True).to(DEVICE)
+        inputs = processor(images=safe_images, text=texts, return_tensors="pt", padding=True).to(DEVICE)
 
-        # Run model
         with torch.no_grad():
             outputs = model(**inputs)
-            probs = outputs.logits_per_image.softmax(dim=1).cpu()
+            logits = outputs.logits_per_image
+            probs = logits.softmax(dim=1).cpu()
 
         for j in range(len(images)):
             if images[j] is None:
                 results.append({"clip_label": None, "clip_confidence": 0.0})
             else:
-                prob = probs[j]
-                label = "inside" if prob[0] > prob[1] else "outside"
-                confidence = prob.max().item()
-                results.append({"clip_label": label, "clip_confidence": confidence})
+                p = probs[j]
+                inside_score = p[: len(INSIDE_PROMPTS)].mean().item()
+                outside_score = p[len(INSIDE_PROMPTS):].mean().item()
+                if inside_score > outside_score:
+                    label, conf = "inside", inside_score
+                else:
+                    label, conf = "outside", outside_score
+                results.append({"clip_label": label, "clip_confidence": conf})
 
     return pd.DataFrame(results)
 

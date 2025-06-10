@@ -3,7 +3,7 @@ import pandas as pd
 from PIL import Image
 from io import BytesIO
 from transformers import CLIPProcessor, CLIPModel
-import torch
+#import torch
 from langchain.prompts import ChatPromptTemplate
 from langchain_community.chat_models import ChatOllama
 from langchain_core.runnables import RunnablePassthrough
@@ -18,26 +18,26 @@ from aiohttp import ClientSession
 from urllib.parse import urlparse
 import pandas as pd
 
-PARQUET_DIR = "./FLAN_CLIP_checkpoints"
+PARQUET_DIR = "./FLAN_CLIP_checkpoints_3"
 
 MAX_CONCURRENT_DOWNLOADS = 20
-DATASET_DIR = "dataset"
+DATASET_DIR = "dataset_tmp"
 INSIDE_DIR = os.path.join(DATASET_DIR, "inside")
 OUTSIDE_DIR = os.path.join(DATASET_DIR, "outside")
 os.makedirs(INSIDE_DIR, exist_ok=True)
 os.makedirs(OUTSIDE_DIR, exist_ok=True)
 download_success_counter = 0
 
-CLIP_PRIMARY_CONF = 0.985
-CLIP_CONF = 0.92
-FLAN_CONF = 0.92
+CLIP_PRIMARY_CONF = 1.1
+CLIP_CONF = 0.6
+FLAN_CONF = 0.6
 
 def datatset_preview(df):
     pd.set_option('display.max_colwidth', None)
     pd.set_option('expand_frame_repr', True)
 
     print("\n--- Sample Preview ---")
-    for i in range(0, min(10000, len(df))):
+    for i in range(0, len(df)):
         row = df.iloc[i]
         if row['final_label'] == 'inside':
             print(f"\nRow {i}:")
@@ -46,6 +46,9 @@ def datatset_preview(df):
             print(f"  CLIP label:     {row['clip_label']} (confidence: {row['clip_confidence']:.4f})")
             print(f"  flan label:    {row['flan_label']} (confidence: {row['flan_confidence']:.4f})")
             print(f"  Description:    {row['caption_attribution_description']}")
+            print(f"  Tags:    {row['clip_tags']}")
+            print(f"  Tags scores:    {row['clip_tags_scores']}")
+
     
     print("\n--- Data Summary ---")
     print("Columns:", list(df.columns))
@@ -76,6 +79,14 @@ def evaluate_image_selection(row):
         flan_conf >= FLAN_CONF
     ):
         return True, "outside"
+    
+    if (
+        clip_label == "inside" and
+        flan_label == "inside" and
+        clip_conf >= CLIP_CONF and
+        flan_conf >= FLAN_CONF
+    ):
+        return True, "inside"
     
     return False, None
 
@@ -149,8 +160,8 @@ def download_selected_images(df_selected):
 
 if __name__ == "__main__":
     selected_images = download_selection() 
-    # datatset_preview(selected_images)
+    datatset_preview(selected_images)
     print()
     print("NUMBER OF IMAGES")
     print(len(selected_images))
-    download_selected_images(selected_images)
+    #download_selected_images(selected_images)

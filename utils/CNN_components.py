@@ -12,11 +12,13 @@ class InitBlock(torch.nn.Module):
             )  
         '''      
         self.init_conv = torch.nn.Conv2d(3, out_channels, kernel_size = 3, stride = 1, padding = 1)
-    
+        #self.pool = torch.nn.MaxPool2d(kernel_size=2, stride=2)
+
     def forward(self, x):
         #y = self.init_conv(x)
         #return torch.nn.functional.relu(x + y, inplace = True)
         x = self.init_conv(x)
+        #x = self.pool(x)
         return torch.nn.functional.relu(x, inplace = True)
         
 

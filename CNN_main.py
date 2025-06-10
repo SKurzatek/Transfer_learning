@@ -3,6 +3,8 @@ import time
 import tqdm
 import copy
 import shutil
+import os
+import datetime 
 
 from torchsummary import summary
 from torch.amp import autocast, GradScaler
@@ -24,7 +26,7 @@ class Network(torch.nn.Module):
         self.init_block = components.InitBlock(out_channels = 64)
         self.blocks = torch.nn.ModuleList([
             components.Module(
-                        conv_blocks_number = 0,
+                        conv_blocks_number = 1,
                         in_channels = 64, 
                         internal_channels = 64,
                         out_channels = 64,
@@ -34,7 +36,7 @@ class Network(torch.nn.Module):
                         dropout = False
                     ),
             components.Module(
-                        conv_blocks_number = 0,
+                        conv_blocks_number = 1,
                         in_channels = 64, 
                         internal_channels = 64,
                         out_channels = 64,
@@ -42,10 +44,20 @@ class Network(torch.nn.Module):
                         max_pool = True,
                         batch_norm = True,
                         dropout = False
+                    ),
+            components.Module(
+                        conv_blocks_number = 1,
+                        in_channels = 64, 
+                        internal_channels = 128,
+                        out_channels = 128,
+                        bypass = True,
+                        max_pool = False,
+                        batch_norm = True,
+                        dropout = False
                     )
         ]) 
         self.gap = torch.nn.AdaptiveAvgPool2d((1, 1))
-        self.classifier = torch.nn.Linear(64, 2)
+        self.classifier = torch.nn.Linear(128, 2)
 
     def forward(self, x):
         x = self.init_block(x)
@@ -62,30 +74,42 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    epochs = 1
+    epochs = 25
     F1_history = [0 for _ in range(epochs)]
     loss_history = [0 for _ in range(epochs)]
     time_history = [0 for _ in range(epochs)]
 
     train_dataset = DynamicResolutionImageDataset(
-            root_dir="./dataset",
-            class_list=class_list
+            root_dir="./dataset/train",
+            class_list=class_list,
+            target_size=(128, 128),
+            train = True
         )
     
     test_dataset = DynamicResolutionImageDataset(
-            root_dir="./dataset",
-            class_list=class_list
+            root_dir="./dataset/valid",
+            class_list=class_list,
+            target_size=(128, 128),
+            train = False
         )
 
-    train_loader = DataLoader(train_dataset, batch_size = 32, shuffle=True, num_workers=4, pin_memory=True)
-    #test_loader = DataLoader(test_dataset, batch_size = 256, shuffle=False, num_workers=4, pin_memory=True)
+    train_loader = DataLoader(train_dataset, 
+                                batch_size = 64, 
+                                shuffle=True, 
+                                num_workers=4, 
+                                pin_memory=True,
+                                prefetch_factor=2,
+                                persistent_workers=True
+    )
+    test_loader = DataLoader(test_dataset, batch_size = 64, shuffle=False, num_workers=4, pin_memory=True)
     
     #test_dataset_size = len(test_dataset)
 
     model = Network()
     model.to(device)
 
-    criterion = torch.nn.CrossEntropyLoss()
+    class_weights = torch.tensor([1.5, 1.0], dtype=torch.float).to(device)
+    criterion = torch.nn.CrossEntropyLoss(weight=class_weights)
     optimizer = torch.optim.Adam(model.parameters(), lr = 0.0001)
     best_F1 = 0
 
@@ -112,23 +136,20 @@ def main():
                     
         end_time = time.time()
 
-        #epoch_f1 = components.evaluate_f1_score(model=model, test_loader=test_loader, device=device)
-        #F1_history[epoch] = epoch_f1
+        epoch_f1 = components.evaluate_f1_score(model=model, test_loader=test_loader, device=device)
+        F1_history[epoch] = epoch_f1
         loss_history[epoch] = total_loss
         time_history[epoch] = end_time - start_time
 
         print(f"Time for testing: {time.time() - end_time}")
-        #print(f"Epoch {epoch + 1}, Training Loss: {total_loss}, F1_scrore: {epoch_f1}, Time: {end_time - start_time}s")
-        print(f"Epoch {epoch + 1}, Training Loss: {total_loss}, Time: {end_time - start_time}s")
+        print(f"Epoch {epoch + 1}, Training Loss: {total_loss}, F1_scrore: {epoch_f1}, Time: {end_time - start_time}s")
+        #print(f"Epoch {epoch + 1}, Training Loss: {total_loss}, Time: {end_time - start_time}s")
         print()
-        '''
         
         if(epoch_f1>best_F1):
             torch.save(copy.deepcopy(model.state_dict()), f"./models/checkpoint/model.pth")
             torch.save(optimizer.state_dict(), f"./models/checkpoint/optimizer.pth")
             best_F1 = epoch_f1
-        
-        '''
 
     print("F1_score:")
     print(F1_history)
@@ -144,13 +165,16 @@ def main():
     save_txt(time_history, "./training_data/time_history.txt")
     print(f"Data gathered. Training performed succesfully.")
 
-    # at the end of the training, type the name of the model, it will move the best model instance 
-    # from chechpoint to models directory and name the model and optimizer files accordingly to the name 
-    filename = input("Enter the model name to save the model and optimizer: ")
-    model_name = filename
-    opt_name = filename + "_optim"
-    shutil.move("./models/checkpoint/model.pth", f"./models/{model_name}.pth")
-    shutil.move("./models/checkpoint/optimizer.pth", f"./models/{opt_name}.pth")
+    # Automatically create timestamped model directory
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    model_dir = os.path.join("./models", timestamp)
+    os.makedirs(model_dir, exist_ok=True)
+
+    # Move files with standardized names
+    shutil.move("./models/checkpoint/model.pth", os.path.join(model_dir, "model.pth"))
+    shutil.move("./models/checkpoint/optimizer.pth", os.path.join(model_dir, "optimizer.pth"))
+
+    print(f"Best model saved to {model_dir}")
 
     
 if __name__ == "__main__":
