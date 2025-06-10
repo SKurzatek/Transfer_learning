@@ -10,7 +10,9 @@ FLAN_CLIP_checkpoints/
 FLAN_CLIP_checkpoints_2/
 FLAN_CLIP_checkpoints_3/
 labeled_data/
-models/
+models/checkpoint/
+models/2025-06-08_12-28-09/
+models/2025-06-08_17-53-01/
 test/
 test_data_archieve/
 training_data/
